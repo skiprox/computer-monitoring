@@ -5,8 +5,7 @@ const ora = require('ora');
 const moment = require('moment');
 const robot = require('robotjs');
 const { table } = require('table');
-const readline = require('readline');
-const { Readable } = require('stream');
+const keypress = require('keypress');
 
 class TimeFiles {
   /**
@@ -14,11 +13,27 @@ class TimeFiles {
    */
   constructor() {
     this.activity = [];
+    this.keyPresses = [];
     this.inStream = null;
-    this.setupKeyStream();
+    this.addListeners();
     this.run();
   }
-  setupKeyStream() {}
+  /**
+   * Set up listeners for key events
+   */
+  addListeners() {
+    keypress(process.stdin);
+    // listen for the "keypress" event
+    process.stdin.on('keypress', (ch, key) => {
+      if (key && key.ctrl && key.name == 'c') {
+        process.exit();
+      } else {
+        this.keyPresses.push(key.name);
+      }
+    });
+    process.stdin.setRawMode(true);
+    process.stdin.resume();
+  }
   /**
    * Run the program
    */
@@ -56,6 +71,7 @@ class TimeFiles {
   }
   startMonitoringActivity() {
     this.currentMousePos = robot.getMousePos();
+    this.keyPresses = [];
   }
   stopMonitoringActivity() {
     const newMousePos = robot.getMousePos();
@@ -63,10 +79,18 @@ class TimeFiles {
       Math.pow(newMousePos.x - this.currentMousePos.x, 2),
       Math.pow(newMousePos.y - this.currentMousePos.y, 2)
     );
+    const keysPressed = this.keyPresses.length;
+    const active = dist !== 0 || keysPressed !== 0;
+    let activeDescription = '';
+    if (active) {
+      activeDescription = `Mouse moved ${dist} pixels during time period. ${this.keyPresses.length} keys pressed during this time period.`;
+    } else {
+      activeDescription = 'No activity logged during time period.';
+    }
     this.activity.push([
       moment().format('hh:mm:ss a'),
-      dist === 0 ? chalk.bgRed('inactive') : chalk.bgGreen('active'),
-      dist === 0 ? 'No activity detected during time period.' : `Mouse moved ${dist} pixels during time period.`
+      active ? chalk.bgGreen('active') : chalk.bgRed('inactive'),
+      activeDescription
     ]);
   }
 }
